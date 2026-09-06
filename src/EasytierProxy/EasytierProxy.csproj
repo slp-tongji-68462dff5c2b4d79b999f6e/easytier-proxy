@@ -6,11 +6,10 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
 
-        <Version>0.0.4</Version>
+        <Version>0.0.1</Version>
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="../Snavi.ArgumentSuggester/Snavi.ArgumentSuggester.csproj" />
         <PackageReference Include="CliWrap" Version="3.10.4" />
         <PackageReference Include="CliFx" Version="3.0.0" />
     </ItemGroup>
