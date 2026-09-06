@@ -1,5 +1,5 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/EasytierProxy/EasytierProxy.csproj" />
+    <Project Path="src/EasytierProxy.Server/EasytierProxy.Server.csproj" />
   </Folder>
 </Solution>
