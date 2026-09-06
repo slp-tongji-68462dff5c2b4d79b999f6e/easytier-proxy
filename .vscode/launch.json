@@ -1,0 +1,23 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "C#: Snavi",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/Snavi/bin/Debug/net10.0/Snavi.dll",
+            "args": [
+                "run",
+                "-c",
+                "${workspaceFolder}/sample-cheats/git/commit.json",
+                "-c",
+                "${workspaceFolder}/sample-cheats/git/checkout.json",
+                "-c",
+                "${workspaceFolder}/sample-cheats/cat/cat.json"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        }
+    ]
+}
