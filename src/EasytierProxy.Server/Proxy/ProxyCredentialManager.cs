@@ -23,10 +23,10 @@ public sealed class ProxyCredentialManager
 
     private async Task LoadAsync(CancellationToken cancellationToken)
     {
-        if (!file.Exists)
+        if (!this.file.Exists)
             return;
 
-        await using var stream = new FileStream(file.FullName, FileMode.Open, FileAccess.Read);
+        await using var stream = new FileStream(this.file.FullName, FileMode.Open, FileAccess.Read);
         var entries = await JsonSerializer.DeserializeAsync<Dictionary<string, byte[]>>(stream, cancellationToken: cancellationToken) ?? [];
         foreach (var (username, hash) in entries)
         {
@@ -57,7 +57,8 @@ public sealed class ProxyCredentialManager
 
     private async Task StoreAsync(CancellationToken cancellationToken)
     {
-        await using var stream = new FileStream(file.FullName, FileMode.Create, FileAccess.Write);
+        await using var stream = new FileStream(this.file.FullName, FileMode.Create, FileAccess.Write);
+        await JsonSerializer.SerializeAsync(stream, this.hashes, cancellationToken: cancellationToken);
     }
 
     private static byte[] Hash(string password)
