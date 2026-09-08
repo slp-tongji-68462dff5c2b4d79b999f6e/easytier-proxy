@@ -7,11 +7,19 @@
         <Nullable>enable</Nullable>
 
         <Version>0.0.1</Version>
+        <AssemblyName>easytier-proxy.server</AssemblyName>
+        <RootNamespace>EasytierProxy.Server</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="CliWrap" Version="3.10.4" />
-        <PackageReference Include="CliFx" Version="3.0.0" />
+        <PackageReference Include="CliWrap" Version="3.10.5" />
+        <PackageReference Include="CliFx" Version="3.0.1" />
+        <PackageReference Include="Titanium.Web.Proxy" Version="7.0.4" />
+        <PackageReference Include="Tjslp.CredentialManager.Protocol" Version="0.0.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
     </ItemGroup>
 
 </Project>

@@ -16,7 +16,7 @@ public sealed class EasytierServer
 
     public EasytierCredentialManager Credentials { get; }
 
-    public static async Task<EasytierServer> RunAsync(
+    public static async Task<EasytierServer> StartAsync(
         string coreCommand,
         string cliCommand,
         string networkName,

@@ -17,8 +17,11 @@ public sealed class ProxyServer : IAsyncDisposable
 
     public ProxyCredentialManager Credentials { get; }
 
-    public static async Task<ProxyServer> CreateAsync(int port, FileInfo credentialsFile, CancellationToken cancellationToken = default)
+    public static async Task<ProxyServer> CreateAsync(int port, DirectoryInfo proxyDirectory, CancellationToken cancellationToken = default)
     {
+        proxyDirectory.Create();
+        var credentialsFile = new FileInfo(Path.Combine(proxyDirectory.FullName, "credentials.json"));
+
         var credentials = await ProxyCredentialManager.LoadAsync(credentialsFile, cancellationToken);
 
         var server = new Titanium.Web.Proxy.ProxyServer(
