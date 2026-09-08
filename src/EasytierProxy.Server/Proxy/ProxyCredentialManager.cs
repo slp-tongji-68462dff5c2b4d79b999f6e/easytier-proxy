@@ -43,10 +43,12 @@ public sealed class ProxyCredentialManager
         return CryptographicOperations.FixedTimeEquals(actualHash, expectedHash);
     }
 
-    public async Task AddAsync(string username, string plainPassword, CancellationToken cancellationToken = default)
+    public async Task<string> AddAsync(string username, CancellationToken cancellationToken = default)
     {
+        var plainPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(18));
         this.hashes[username] = Hash(plainPassword);
         await this.StoreAsync(cancellationToken);
+        return plainPassword;
     }
 
     public async Task RemoveAsync(string username, CancellationToken cancellationToken = default)
@@ -65,10 +67,5 @@ public sealed class ProxyCredentialManager
     {
         var bytes = System.Text.Encoding.UTF8.GetBytes(password);
         return SHA256.HashData(bytes);
-    }
-
-    public static string GeneratePassword()
-    {
-        return Convert.ToBase64String(RandomNumberGenerator.GetBytes(18));
     }
 }
