@@ -4,11 +4,17 @@ using CliWrap;
 
 namespace EasytierProxy.Server.Easytier;
 
-public sealed class EasytierServer(
-    EasytierCredentialManager credentials,
-    CommandTask<CommandResult> processTask)
+public sealed class EasytierServer
 {
-    public EasytierCredentialManager Credentials { get; } = credentials;
+    private readonly CommandTask<CommandResult> processTask;
+
+    private EasytierServer(EasytierCredentialManager credentials, CommandTask<CommandResult> processTask)
+    {
+        this.Credentials = credentials;
+        this.processTask = processTask;
+    }
+
+    public EasytierCredentialManager Credentials { get; }
 
     public static async Task<EasytierServer> RunAsync(
         string coreCommand,
@@ -105,5 +111,5 @@ public sealed class EasytierServer(
         return builder.ToString();
     }
 
-    public Task WaitForExitAsync() => processTask.Task;
+    public Task WaitForExitAsync() => this.processTask.Task;
 }
