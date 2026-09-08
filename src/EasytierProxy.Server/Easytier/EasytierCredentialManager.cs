@@ -65,7 +65,7 @@ public sealed class EasytierCredentialManager(string cliBinary, int rpcPort)
         IEnumerable<string> credentialArguments,
         CancellationToken cancellationToken)
     {
-        var arguments = new List<string> { "-o", "json", "-p", $"127.0.0.1:{rpcPort}", "credential" };
+        var arguments = new List<string> { "--output", "json", "--rpc-portal", $"127.0.0.1:{rpcPort}", "credential" };
         arguments.AddRange(credentialArguments);
 
         var result = await Cli.Wrap(cliBinary)
