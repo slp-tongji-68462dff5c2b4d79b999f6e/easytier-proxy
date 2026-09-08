@@ -29,8 +29,8 @@ public sealed class EasytierCredentialManager(string cliBinary, int rpcPort)
 
         Debug.Assert(generated is not null);
 
-        var listed = await ListAsync(cancellationToken);
-        var actualExpiry = listed.First(c => c.CredentialId == generated.CredentialId).Expiry;
+        var actualExpiry = (await ListAsync(cancellationToken)
+            .SingleAsync(c => c.CredentialId == generated.CredentialId, cancellationToken)).Expiry;
 
         return (
             generated.CredentialId,
@@ -48,7 +48,8 @@ public sealed class EasytierCredentialManager(string cliBinary, int rpcPort)
         return result.Success;
     }
 
-    public async Task<IReadOnlyList<(string CredentialId, DateTimeOffset Expiry)>> ListAsync(CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<(string CredentialId, DateTimeOffset Expiry)> ListAsync(
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var list = await RunCredentialAsync<CredentialListResult>(
             ["list"],
@@ -56,9 +57,10 @@ public sealed class EasytierCredentialManager(string cliBinary, int rpcPort)
 
         Debug.Assert(list is not null);
 
-        return list.Credentials
-            .Select(c => (c.CredentialId, DateTimeOffset.FromUnixTimeSeconds(c.ExpiryUnix)))
-            .ToList();
+        foreach (var credential in list.Credentials)
+        {
+            yield return (credential.CredentialId, DateTimeOffset.FromUnixTimeSeconds(credential.ExpiryUnix));
+        }
     }
 
     private async Task<T?> RunCredentialAsync<T>(
