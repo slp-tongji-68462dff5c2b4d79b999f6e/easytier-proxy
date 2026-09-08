@@ -1,89 +1,93 @@
-using EasytierProxy.Server.Credentials;
+using EasytierProxy.Server.Easytier;
+using EasytierProxy.Server.Proxy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Tjslp.CredentialManager.Protocol;
 
 namespace EasytierProxy.Server.CredentialManagement;
 
 public sealed class CredentialManageServer : IAsyncDisposable
 {
     private readonly EasytierCredentialManager credentials;
-    private readonly ProxyUserRegistry users;
+    private readonly ProxyCredentialManager proxyCredentials;
     private readonly WebApplication app;
 
     private CredentialManageServer(
-        EasytierCredentialManager credentials, ProxyUserRegistry users, WebApplication app)
+        EasytierCredentialManager credentials, ProxyCredentialManager proxyCredentials, WebApplication app)
     {
         this.credentials = credentials;
-        this.users = users;
+        this.proxyCredentials = proxyCredentials;
         this.app = app;
     }
 
-    public static async Task<CredentialManageServer> Start(
-        EasytierCredentialManager credentials, ProxyUserRegistry users, string listen)
+    public static async Task<CredentialManageServer> StartAsync(
+        EasytierCredentialManager credentials, ProxyCredentialManager proxyCredentials, int port)
     {
-        var builder = WebApplication.CreateSlimBuilder();
+        var builder = WebApplication.CreateEmptyBuilder(new WebApplicationOptions());
 
-        builder.WebHost.UseUrls(listen);
+        builder.Services.AddRouting();
+        builder.WebHost.UseKestrel(kestrel => kestrel.ListenLocalhost(port));
 
         var app = builder.Build();
 
-        var server = new CredentialManageServer(credentials, users, app);
+        var server = new CredentialManageServer(credentials, proxyCredentials, app);
 
-        app.MapPost("/generate", server.HandleGenerateAsync);
+        app.MapPost("/create", server.HandleCreateAsync);
+        app.MapPost("/query", server.HandleQueryAsync);
         app.MapPost("/revoke", server.HandleRevokeAsync);
-        app.MapPost("/list", server.HandleListAsync);
 
         await app.StartAsync();
         return server;
     }
 
-    public async Task StopAsync()
+    private async Task<CreateResponse> HandleCreateAsync(CreateRequest request, CancellationToken cancellationToken)
     {
-        await this.app.StopAsync();
+        var credential = await this.credentials.GenerateAsync(request.Expire, cancellationToken);
+
+        var proxyPassword = await this.proxyCredentials.AddAsync(credential.CredentialId, cancellationToken);
+
+        return new CreateResponse(
+            credential.CredentialId,
+            $"{credential.CredentialSecret}:{proxyPassword}",
+            credential.Expiry);
     }
 
-    private async Task<IResult> HandleGenerateAsync(GenerateRequest request, CancellationToken cancellationToken)
+    private async Task<QueryResponse> HandleQueryAsync(QueryRequest request, CancellationToken cancellationToken)
     {
-        var credential = await this.credentials.GenerateAsync(request.TimeToLive, cancellationToken);
-
-        var proxyPassword = ProxyUserRegistry.GeneratePassword();
-        this.users.Add(credential.CredentialId, proxyPassword);
-
-        return Results.Json(new
+        if (request.CredentialIds.Count == 0)
         {
-            id = credential.CredentialId,
-            credential = $"{credential.CredentialSecret}:{proxyPassword}",
-        });
-    }
-
-    private async Task<IResult> HandleRevokeAsync(RevokeRequest request, CancellationToken cancellationToken)
-    {
-        await this.credentials.RevokeAsync(request.Id, cancellationToken);
-        this.users.Remove(request.Id);
-        return Results.NoContent();
-    }
-
-    private async Task<IResult> HandleListAsync(ListRequest request, CancellationToken cancellationToken)
-    {
-        var credentials = await this.credentials.ListAsync(cancellationToken);
-
-        IEnumerable<CredentialInfo> selected = credentials;
-        if (request.Ids is not null)
-        {
-            var byId = credentials.ToDictionary(c => c.CredentialId, StringComparer.Ordinal);
-            selected = request.Ids
-                .Where(id => byId.ContainsKey(id))
-                .Select(id => byId[id]);
+            return new QueryResponse([]);
         }
 
-        var result = selected.Select(credential => new
+        var byId = await this.credentials.ListAsync(cancellationToken)
+            .ToDictionaryAsync();
+
+        var items = new List<QueryItem>();
+        foreach (var credentialId in request.CredentialIds)
         {
-            id = credential.CredentialId,
-            expire = DateTimeOffset.FromUnixTimeSeconds(credential.ExpiryUnix),
-        });
-        return Results.Json(result);
+            if (byId.TryGetValue(credentialId, out var expiry))
+            {
+                items.Add(new QueryItem(credentialId, expiry));
+            }
+            else
+            {
+                await this.proxyCredentials.RemoveAsync(credentialId, cancellationToken);
+            }
+        }
+
+        return new QueryResponse(items);
+    }
+
+    private async Task<RevokeResponse> HandleRevokeAsync(RevokeRequest request, CancellationToken cancellationToken)
+    {
+        var succeeded = await this.credentials.RevokeAsync(request.CredentialId, cancellationToken);
+        if (succeeded)
+        {
+            await this.proxyCredentials.RemoveAsync(request.CredentialId, cancellationToken);
+        }
+
+        return new RevokeResponse(succeeded);
     }
 
     public async ValueTask DisposeAsync()
