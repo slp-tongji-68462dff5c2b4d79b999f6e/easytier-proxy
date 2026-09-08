@@ -11,11 +11,16 @@ public sealed class EasytierCredentialManager(string cliBinary, int rpcPort)
         DateTimeOffset? expiry,
         CancellationToken cancellationToken = default)
     {
-        var seconds = 999999999999;
-        if (expiry is { } target)
+        var effectiveExpiry = expiry ?? DateTimeOffset.UtcNow.AddSeconds(999999999999);
+        var seconds = (long)(effectiveExpiry - DateTimeOffset.UtcNow).TotalSeconds;
+        if (seconds > 999999999999)
         {
-            var requested = (long)(target - DateTimeOffset.UtcNow).TotalSeconds;
-            seconds = Math.Min(requested, seconds);
+            seconds = 999999999999;
+        }
+
+        if (seconds < 60)
+        {
+            seconds = 60;
         }
 
         var generated = await RunCredentialAsync<GeneratedCredential>(
@@ -24,10 +29,13 @@ public sealed class EasytierCredentialManager(string cliBinary, int rpcPort)
 
         Debug.Assert(generated is not null);
 
+        var listed = await ListAsync(cancellationToken);
+        var actualExpiry = listed.First(c => c.CredentialId == generated.CredentialId).Expiry;
+
         return (
             generated.CredentialId,
             generated.CredentialSecret,
-            DateTimeOffset.FromUnixTimeSeconds(generated.ExpiryUnix));
+            actualExpiry);
     }
 
     public async Task<bool> RevokeAsync(string credentialId, CancellationToken cancellationToken = default)
@@ -57,7 +65,7 @@ public sealed class EasytierCredentialManager(string cliBinary, int rpcPort)
         IEnumerable<string> credentialArguments,
         CancellationToken cancellationToken)
     {
-        var arguments = new List<string> { "-o", "json", "-p", $"{rpcPort}", "credential" };
+        var arguments = new List<string> { "-o", "json", "-p", $"127.0.0.1:{rpcPort}", "credential" };
         arguments.AddRange(credentialArguments);
 
         var result = await Cli.Wrap(cliBinary)
