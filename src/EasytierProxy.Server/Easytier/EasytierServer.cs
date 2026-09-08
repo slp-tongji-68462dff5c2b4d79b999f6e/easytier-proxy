@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using CliWrap;
 
 namespace EasytierProxy.Server.Easytier;
@@ -13,8 +14,10 @@ public sealed class EasytierServer(
         string coreCommand,
         string cliCommand,
         string networkName,
+        string ipv4,
         int rpcPort,
         IReadOnlyList<string> peers,
+        int proxyListenPort,
         DirectoryInfo easytierDataDirectory,
         CancellationToken cancellationToken = default)
     {
@@ -32,33 +35,74 @@ public sealed class EasytierServer(
             await File.WriteAllTextAsync(networkSecretPath, networkSecret, cancellationToken);
         }
 
+        var credentialFile = Path.Combine(easytierDataDirectory.FullName, "credentials.json");
+        var configPath = Path.Combine(easytierDataDirectory.FullName, "config.toml");
+        var config = BuildConfig(networkName, networkSecret, ipv4, credentialFile, peers, proxyListenPort);
+        await File.WriteAllTextAsync(configPath, config, cancellationToken);
+
         var credentials = new EasytierCredentialManager(cliCommand, rpcPort);
 
-        var arguments = new List<string>
-        {
-            "--network-name", networkName,
-            "--network-secret", networkSecret,
-            "--rpc-portal", $"{rpcPort}",
-            "--credential-file", Path.Combine(easytierDataDirectory.FullName, "credentials.json"),
-        };
-
-        foreach (var peer in peers)
-        {
-            arguments.Add("--peers");
-            arguments.Add(peer);
-        }
-
-        arguments.Add("--no-listener");
-        arguments.Add("--no-tun");
-
         var processTask = Cli.Wrap(coreCommand)
-            .WithArguments(arguments)
+            .WithArguments(["--config-file", configPath, "--rpc-portal", $"{rpcPort}"])
             .WithStandardOutputPipe(PipeTarget.ToDelegate(Console.Out.WriteLine))
             .WithStandardErrorPipe(PipeTarget.ToDelegate(Console.Error.WriteLine))
             .WithValidation(CommandResultValidation.None)
             .ExecuteAsync();
 
         return new EasytierServer(credentials, processTask);
+    }
+
+    private static string BuildConfig(
+        string networkName,
+        string networkSecret,
+        string ipv4,
+        string credentialFile,
+        IReadOnlyList<string> peers,
+        int proxyListenPort)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine(
+            $"""
+            ipv4 = "{ipv4}"
+            listeners = []
+
+            [network_identity]
+            network_name = "{networkName}"
+            network_secret = "{networkSecret}"
+
+            [flags]
+            no_tun = true
+            private_mode = true
+
+            credential_file = "{credentialFile}"
+            """);
+
+        foreach (var peer in peers)
+        {
+            builder.AppendLine(
+                $"""
+                [[peer]]
+                uri = "{peer}"
+                """);
+        }
+
+        builder.AppendLine(
+            $"""
+            [[acl.acl_v1.chains]]
+            name = "inbound"
+            chain_type = 1
+            enabled = true
+            default_action = 2
+
+            [[acl.acl_v1.chains.rules]]
+            name = "allow-proxy"
+            enabled = true
+            protocol = 5
+            ports = ["{proxyListenPort}"]
+            action = 1
+            """);
+
+        return builder.ToString();
     }
 
     public Task WaitForExitAsync() => processTask.Task;
