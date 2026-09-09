@@ -55,11 +55,6 @@ public sealed class CredentialManageServer : IAsyncDisposable
 
     private async Task<QueryResponse> HandleQueryAsync(QueryRequest request, CancellationToken cancellationToken)
     {
-        if (request.CredentialIds.Count == 0)
-        {
-            return new QueryResponse([]);
-        }
-
         var byId = await this.credentials.ListAsync(cancellationToken)
             .ToDictionaryAsync();
 
