@@ -7,16 +7,17 @@ namespace EasytierProxy.Server.Easytier;
 
 public sealed class EasytierCredentialManager(string cliBinary, int rpcPort)
 {
+    private static readonly DateTimeOffset MaxExpiry = DateTimeOffset.MaxValue.AddYears(-1);
+
     public async Task<(string CredentialId, string CredentialSecret, DateTimeOffset Expiry)> GenerateAsync(
         DateTimeOffset? expiry,
         CancellationToken cancellationToken = default)
     {
-        var effectiveExpiry = expiry ?? DateTimeOffset.UtcNow.AddSeconds(999999999999);
-        var seconds = (long)(effectiveExpiry - DateTimeOffset.UtcNow).TotalSeconds;
-        if (seconds > 999999999999)
+        if (!expiry.HasValue || expiry > MaxExpiry)
         {
-            seconds = 999999999999;
+            expiry = MaxExpiry;
         }
+        var seconds = (long)(expiry.Value - DateTimeOffset.UtcNow).TotalSeconds;
 
         if (seconds < 60)
         {
