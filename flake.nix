@@ -9,10 +9,6 @@
       forAllSystems = nixpkgs.lib.genAttrs nixpkgs.lib.systems.flakeExposed;
     in
     {
-      packages = forAllSystems (system: {
-        default = nixpkgs.legacyPackages.${system}.callPackage ./nix { };
-      });
-
       devShells = forAllSystems (
         system:
         let
